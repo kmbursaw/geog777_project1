@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Nitrate and Cancer Rates in Wisconsin</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+    <link href="https://api.mapbox.com/mapbox-gl-js/v3.9.3/mapbox-gl.css" rel="stylesheet">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.9.3/mapbox-gl.js"></script>
+    <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/regression@2.0.1/dist/regression.min.js"></script>
+    <style>
+        body { margin: 0; display: flex; height: 100vh; }
+        #map { flex: 1; }
+        #left-panel {
+            width: 250px;
+            background: rgba(102, 98, 98, 0.9);
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+            border-radius: 5px;
+        }
+        #left-panel label {
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+            margin-bottom: 5px;
+            width: 100%;
+        }
+
+        #left-panel input {
+            width: 80%;
+            padding: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            text-align: center;
+        }
+        #menu {
+            background: rgba(255, 255, 255, 0.9); 
+            position: absolute;
+            z-index: 1000; 
+            bottom: 30px;
+            right: 10px;
+            border-radius: 5px;
+            width: 150px;
+            border: 1px solid rgba(0, 0, 0, 0.4);
+            font-family: 'Open Sans', sans-serif;
+            box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.5);
+            padding: 5px; 
+            display: flex;
+            flex-direction: column;
+        }
+
+        #menu a {
+            font-size: 14px;
+            color: #404040;
+            display: block;
+            margin: 5px;
+            padding: 10px;
+            text-decoration: none;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            background: #f8f8f8;
+            text-align: center;
+            transition: background 0.2s ease-in-out;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+
+        #menu a:hover {
+            background-color: #e0e0e0;
+        }
+
+        #menu a.active {
+            background-color: #3887be;
+            color: #ffffff;
+        }
+
+        #menu a.active:hover {
+            background: #3074a4;
+        }
+
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px;
+            border-radius: 5px;
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
+        }
+
+        .legend h3 {
+            margin: 0 0 5px;
+            font-size: 14px;
+            text-align: center;
+        }
+
+        .legend-scale {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        .legend-color {
+            width: 15px;
+            height: 15px;
+            margin-right: 5px;
+            border: 1px solid #000;
+        }
+
+        #cancer-legend {
+            position: absolute;
+            bottom: 20px;
+            left: 150px; /* Adjust positioning */
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px;
+            border-radius: 5px;
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
+        }
+
+        #cancer-legend h3 {
+            margin: 0 0 5px;
+            font-size: 14px;
+            text-align: center;
+        }
+
+        #cancer-legend .legend-scale {
+            display: flex;
+            flex-direction: column;
+        }
+
+        #cancer-legend .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        #cancer-legend .legend-color {
+            width: 15px;
+            height: 15px;
+            margin-right: 5px;
+            border: 1px solid #000;
+        }
+
+        #hexbin-legend {
+            position: absolute;
+            bottom: 20px;
+            left: 280px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px;
+            border-radius: 5px;
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
+            display: none;
+        }
+
+        #hexbin-legend h3 {
+            margin: 0 0 5px;
+            font-size: 14px;
+            text-align: center;
+        }
+
+        #hexbin-legend .legend-scale {
+            display: flex;
+            flex-direction: column;
+        }
+
+        #hexbin-legend .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        #hexbin-legend .legend-color {
+            width: 15px;
+            height: 15px;
+            margin-right: 5px;
+            border: 1px solid #000;
+        }
+
+
+    </style>
+</head>
+<body>
+    <div id="left-panel">
+        <h2>Nitrate and Cancer Rates in Wisconsin</h2>
+        <p style="font-size: 14px; color: black; text-align: center; margin-bottom: 10px;">
+            To perform a linear regression on the cancer rates in Wisconsin by nitrate levels recorded in wells, 
+            enter a decay coefficient greater than 0, and a hexbin area from 6-90 square miles. The resulting hexbins will
+            appear on the screen. Additionally, the regression equation fit will appear below, as well as an R Squared value. The
+            closer R Squared is to 1, the better the model fit. To help with the visualization, the user can right click and hold to pan the
+            view down to see a 3D representation of the hexbin levels.
+        </p>
+        <label for="decay-coefficient">Decay Coefficient</label>
+        <input type="number" id="decay-coefficient" placeholder="Enter value">
+        
+        <label for="hexbin-area">Hexbin Area (5 - 90)</label>
+        <input type="number" id="hexbin-area" min="5" max="90" placeholder="Enter value">
+
+        <button id="calculate-button">Calculate</button>
+
+        <button id="reset-hexbin" style="margin-top: 10px;">Reset Hexbin</button>
+
+
+        <div id="regression-results" style="
+            width: 100%;
+            margin-top: 10px;
+            padding: 8px;
+            background: rgba(255,255,255,0.9);
+            display: none;
+            font-family: Arial, sans-serif;
+            text-align: center;
+            font-size: 14px;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+            "></div>
+
+    </div>
+    <div id="legend" class="legend">
+        <h3>Nitrate Levels</h3>
+        <div class="legend-scale"></div>
+    </div>
+    <div id="cancer-legend" class="legend">
+        <h3>Cancer Rate</h3>
+        <div class="legend-scale"></div>
+    </div>
+    <div id="hexbin-legend" class="legend">
+        <h3>Hexbin Stadard Deviation of Residuals</h3>
+        <div class="legend-scale"></div>
+    </div>    
+    <nav id="menu"></nav> 
+    <div id="map"></div>
+
+    
+
+    <script>
+        //mapbox access token
+        mapboxgl.accessToken = 'pk.eyJ1Ijoia21idXJzYXciLCJhIjoiY202Y3lkenNmMDA1bTJsb255M2g4OGY3YyJ9.KqwpV9vQXTv2nbFKEZ_y7w';
+
+        //creates new map and centers it directly overhead on wisconsin
+        const map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/dark-v10',
+            center: [-90.016479, 44.225520],
+            zoom: 6,
+            pitch: 0,
+            bearing: 0,
+            antialias: true
+        });
+
+        //adds navigation controls
+        map.addControl(new mapboxgl.NavigationControl());
+        map.addControl(new mapboxgl.FullscreenControl());
+
+        //on map load, sets digital elevation model to help visualize the 3d hexbins
+        map.on('load', async () => {
+            map.addSource('mapbox-dem', {
+                type: 'raster-dem',
+                url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
+                tileSize: 512,
+                maxzoom: 14
+            });
+            //sets terrain to help visualize 3d hexbins
+            map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.5 });
+
+            const fetchGeoJSON = async (url) => {
+                const response = await fetch(url);
+                return await response.json();
+            };
+
+            //fetches geojsons
+            const cancerTracts = await fetchGeoJSON('cancer_tracts.geojson');
+            const cancerCounty = await fetchGeoJSON('cancer_county.geojson');
+            const wellNitrate = await fetchGeoJSON('well_nitrate.geojson');
+
+            const hexGrid = turf.hexGrid([-93, 42, -86, 47], 10, { units: 'miles' });
+            const aggregated = turf.collect(hexGrid, wellNitrate, 'nitrate_level', 'values');
+            aggregated.features.forEach((feature) => {
+                feature.properties.nitrate = feature.properties.values.reduce((a, b) => a + b, 0) || 0;
+            });
+
+            //constructs nitratelegend
+            const nitrateLegend = document.querySelector('#legend .legend-scale');
+
+            //defines color scale for well nitrate levels
+            const nitrateLevels = [
+                { value: "0", color: "#ffffb2" }, 
+                { value: "2", color: "#fecc5c" },
+                { value: "5", color: "#fd8d3c" },
+                { value: "10", color: "#f03b20" },
+                { value: "15+", color: "#bd0026" } 
+            ];
+
+            //populates the nitrate legend dynamically
+            nitrateLevels.forEach(level => {
+                const item = document.createElement('div');
+                item.className = 'legend-item';
+
+                const colorBox = document.createElement('div');
+                colorBox.className = 'legend-color';
+                colorBox.style.backgroundColor = level.color;
+
+                const label = document.createElement('span');
+                label.textContent = level.value;
+
+                item.appendChild(colorBox);
+                item.appendChild(label);
+                nitrateLegend.appendChild(item);
+            });
+
+
+            //constructs cancerlegend
+            const cancerLegend = document.querySelector('#cancer-legend .legend-scale');
+
+            //defines color scale
+            const cancerLevels = [
+                { value: "0", color: "#edf8fb" },
+                { value: "0.05", color: "#b2e2e2" },
+                { value: "0.10", color: "#66c2a4" },
+                { value: "0.15", color: "#2ca25f" },
+                { value: "0.20+", color: "#006d2c" }
+            ];
+
+            //populates legend
+            cancerLevels.forEach(level => {
+                const item = document.createElement('div');
+                item.className = 'legend-item';
+
+                const colorBox = document.createElement('div');
+                colorBox.className = 'legend-color';
+                colorBox.style.backgroundColor = level.color;
+
+                const label = document.createElement('span');
+                label.textContent = level.value;
+
+                item.appendChild(colorBox);
+                item.appendChild(label);
+                cancerLegend.appendChild(item);
+            });
+
+            //constructs hexbin legend
+            const hexbinLegend = document.querySelector('#hexbin-legend .legend-scale');
+
+            //defines color scale for hexbin layer
+            const hexbinLevels = [
+                { value: "< -2 Std Dev (Very Low)", color: "#053061" },
+                { value: "-1 to -2 Std Dev (Low)", color: "#4393c3" },
+                { value: "-1 to +1 Std Dev (Neutral)", color: "#f7f7f7" },
+                { value: "+1 to +2 Std Dev (High)", color: "#d6604d" },
+                { value: "> +2 Std Dev (Very High)", color: "#67001f" }
+            ];
+
+            //populates the hexbin legend dynamically
+            hexbinLevels.forEach(level => {
+                const item = document.createElement('div');
+                item.className = 'legend-item';
+
+                const colorBox = document.createElement('div');
+                colorBox.className = 'legend-color';
+                colorBox.style.backgroundColor = level.color;
+
+                const label = document.createElement('span');
+                label.textContent = level.value;
+
+                item.appendChild(colorBox);
+                item.appendChild(label);
+                hexbinLegend.appendChild(item);
+            });
+
+
+            //aggregates grid and creates extrapolated hexbins for 3d effect
+            map.addSource('aggregated-grid', { type: 'geojson', data: aggregated });
+            map.addLayer({
+                id: 'aggregated-grid-layer',
+                type: 'fill-extrusion',
+                source: 'aggregated-grid',
+                paint: {
+                    'fill-extrusion-color': [
+                        'case',
+                        ['has', 'residual'],
+                        ['interpolate', ['linear'], ['get', 'residual'],
+                            -2, '#053061',
+                            -1, '#4393c3',
+                            0, '#f7f7f7',
+                            1, '#d6604d',
+                            2, '#67001f'
+                        ],
+                        '#cccccc'
+                    ],
+                    'fill-extrusion-height': [
+                        'case',
+                        ['has', 'residual'],
+                        ['interpolate', ['linear'], ['abs', ['get', 'residual']],
+                        -2, 15000,
+                        -1, 30000,
+                        0, 45000,
+                        1, 65000,
+                        2, 85000
+                    ],
+                        100
+                    ],
+
+                    'fill-extrusion-opacity': 0.8
+                },
+                layout: { visibility: 'none' }
+            });
+
+
+
+            //adds border layer to hexbins to help reader see bins when directly over the top
+            map.addLayer({
+                id: 'aggregated-grid-border',
+                type: 'line',
+                source: 'aggregated-grid',
+                layout: {},
+                paint: {
+                    'line-color': '#000000',
+                    'line-width': 1.5,
+                    'line-opacity': 1.0
+                },
+                layout: { visibility: 'none' } 
+            });
+
+
+            //colors cancer tracts layer
+            map.addSource('cancer-tracts', { type: 'geojson', data: cancerTracts });
+            map.addLayer({
+                id: 'cancer-tracts-layer',
+                type: 'fill',
+                source: 'cancer-tracts',
+                paint: {
+                    'fill-color': [
+                        'interpolate', ['linear'], ['get', 'canrate'],
+                        0.00, '#edf8fb',
+                        0.05, '#b2e2e2',
+                        0.10, '#66c2a4',
+                        0.15, '#2ca25f',
+                        0.20, '#006d2c'
+                    ],
+                    'fill-opacity': 0.6,
+                    'fill-outline-color': '#000000'
+                },
+                layout: { visibility: 'visible' }
+            });
+
+                map.addSource('cancer-county', { type: 'geojson', data: cancerCounty });
+            map.addLayer({
+                id: 'cancer-county-layer',
+                type: 'line',
+                source: 'cancer-county',
+                paint: {
+                    'fill-color': [
+                        'interpolate', ['linear'], ['get', 'canrate'],
+                        0, '#ffffb2',
+                        10, '#fecc5c',
+                        20, '#fd8d3c',
+                        30, '#f03b20',
+                        40, '#bd0026'
+                    ],
+                    'fill-opacity': 0.5
+                },
+                layout: { visibility: 'visible' }
+            });
+
+            //adds well nitrates layer
+            map.addSource('well-nitrate', { type: 'geojson', data: wellNitrate });
+            map.addLayer({
+                id: 'well-nitrate-layer',
+                type: 'circle',
+                source: 'well-nitrate',
+                paint: {
+                    'circle-radius': 3,
+                    'circle-color': '#21908d',
+                    'circle-stroke-color': '#ffffff',
+
+                    //applys the gradient color scale based on nitr_rad
+                    'circle-color': [
+                        'case',
+                        ['has', 'nitr_ran'],
+                        ['interpolate',
+                            ['linear'],
+                            ['get', 'nitr_ran'],
+                            0, '#ffffb2',
+                            2, '#fecc5c',
+                            5, '#fd8d3c',
+                            10, '#f03b20',
+                            15, '#bd0026'
+                        ],
+                        '#888888'
+                ]
+                },
+                layout: { visibility: 'visible' }
+            });
+
+            //gives id names to layers
+            const toggleableLayers = [
+                { id: 'aggregated-grid-layer', name: 'Hexbin Layer' },
+                { id: 'cancer-tracts-layer', name: 'Cancer Tracts' },
+                { id: 'well-nitrate-layer', name: 'Well Nitrate' }
+            ];
+
+
+            //adds a click event listener for the hexbin layer
+            map.on('click', 'aggregated-grid-layer', (e) => {
+                console.log("Hexbin clicked:", e.features[0]);  // Check if clicking works
+            
+
+                const feature = e.features[0];  // Get clicked hexbin
+                const properties = feature.properties;
+
+                //gets observed and predicted cancer rates
+                const observedCancerRate = properties.actual_cancer !== null ? properties.actual_cancer.toFixed(4) : "N/A";
+                const predictedCancerRate = properties.predicted_cancer !== null ? properties.predicted_cancer.toFixed(4) : "N/A";
+
+                //creates a popup
+                new mapboxgl.Popup()
+                    .setLngLat(e.lngLat)
+                    .setHTML(`
+                        <strong>Hexbin Info</strong><br>
+                        <strong>Observed Cancer Rate:</strong> ${observedCancerRate} <br>
+                        <strong>Predicted Cancer Rate:</strong> ${predictedCancerRate}
+                    `)
+                    .addTo(map);
+            });
+
+
+            //changes cursor when hovering over hexbins
+            map.on('mouseenter', 'aggregated-grid-layer', () => {
+                map.getCanvas().style.cursor = 'pointer';
+            });
+
+            map.on('mouseleave', 'aggregated-grid-layer', () => {
+                map.getCanvas().style.cursor = '';
+            });
+
+
+
+
+            //function to toggle the visibility of layers and their legends
+            function toggleLayer(layerId, link) {
+                const visibility = map.getLayoutProperty(layerId, 'visibility');
+                const newVisibility = visibility === 'none' ? 'visible' : 'none';
+                map.setLayoutProperty(layerId, 'visibility', newVisibility);
+                
+                //toggles button active class
+                link.className = newVisibility === 'none' ? '' : 'active';
+
+                //toggles the nitrate legend when the well nitrate layer is toggled
+                if (layerId === 'well-nitrate-layer') {
+                    document.getElementById('legend').style.display = newVisibility === 'none' ? 'none' : 'block';
+                }
+
+                //toggles the cancer legend when the cancer tracts layer is toggled
+                if (layerId === 'cancer-tracts-layer') {
+                    document.getElementById('cancer-legend').style.display = newVisibility === 'none' ? 'none' : 'block';
+                }
+
+                //toggle hexbin legend when the hexbin layer is toggled
+                if (layerId === 'aggregated-grid-layer') {
+                    map.setLayoutProperty('aggregated-grid-border', 'visibility', newVisibility);
+                    document.getElementById('hexbin-legend').style.display = newVisibility === 'none' ? 'none' : 'block';
+                }
+            }
+
+            //loads the well nitrate and cancer tract legends on initial page load
+            document.addEventListener("DOMContentLoaded", () => {
+                document.getElementById('legend').style.display = 
+                    map.getLayoutProperty('well-nitrate-layer', 'visibility') === 'none' ? 'none' : 'block';
+
+                document.getElementById('cancer-legend').style.display = 
+                    map.getLayoutProperty('cancer-tracts-layer', 'visibility') === 'none' ? 'none' : 'block';
+            });
+
+            
+            const menu = document.getElementById('menu');
+
+            toggleableLayers.forEach(layer => {
+                const link = document.createElement('a');
+                link.id = layer.id;
+                link.href = '#';
+                link.textContent = layer.name;
+
+            //checks initial visibility and sets active states accordingly
+            const visibility = map.getLayoutProperty(layer.id, 'visibility');
+            link.className = visibility === 'none' ? '' : 'active';
+
+            link.onclick = function (e) {
+                e.preventDefault();
+                toggleLayer(layer.id, this);
+            };
+
+            menu.appendChild(link);
+        });
+
+        //adds actions when calculate button is pushed by user
+        document.getElementById('calculate-button').addEventListener('click', calculateHexbins);
+
+        //function to calculate hexbins and then display them as well as run the regression equation and display its results
+        function calculateHexbins() {
+            try {
+                console.log("Starting hexbin calculation...");
+
+                //gets user inputs
+                const decayCoefficient = parseFloat(document.getElementById('decay-coefficient').value);
+                const hexbinArea = parseFloat(document.getElementById('hexbin-area').value);
+
+                if (isNaN(decayCoefficient) || isNaN(hexbinArea) || hexbinArea < 6 || hexbinArea > 90) {
+                    alert("Please enter a valid decay coefficient and hexbin area between 6 and 90.");
+                    return;
+                }
+
+                //ensures geojson data is available
+                if (!wellNitrate || !cancerTracts) {
+                    console.error("GeoJSON data not loaded.");
+                    return;
+                }
+
+                console.log("Generating regression data...");
+
+                //generates regression data
+                let regressionData = [];
+                cancerTracts.features.forEach(tract => {
+                    if (!tract.geometry || !tract.geometry.coordinates) {
+                        console.warn("Skipping tract with missing geometry:", tract);
+                        return;
+                    }
+
+                    let cancerRate = tract.properties.canrate;
+                    let tractPoint = turf.centroid(tract);
+
+                    let nearestNitrate = wellNitrate.features
+                        .map(well => {
+                            if (!well.geometry || !well.geometry.coordinates) return null;
+
+                            let wellPoint = turf.point(well.geometry.coordinates);
+                            return {
+                                nitrate: well.properties.nitr_ran,
+                                distance: turf.distance(tractPoint, wellPoint, { units: 'miles' })
+                            };
+                        })
+                        .filter(item => item !== null)
+                        .sort((a, b) => a.distance - b.distance)[0];
+
+                    if (nearestNitrate && typeof nearestNitrate.nitrate === 'number') {
+                        regressionData.push([nearestNitrate.nitrate, cancerRate]);
+                    }
+                });
+
+                console.log("Regression Data Prepared:", regressionData);
+
+                //ensures regression is computed before continuing
+                if (regressionData.length > 0) {
+                    performRegression(regressionData);
+
+                    setTimeout(() => {
+                        if (!regressionResults || typeof regressionResults.m !== "number" || typeof regressionResults.b !== "number") {
+                            console.error("Regression results are missing or invalid:", regressionResults);
+                            alert("Regression failed. Please check input values.");
+                            return;
+                        }
+
+                        console.log("Regression successfully computed. Proceeding with hexbin computation.");
+
+                        //generates hexbins using idw interpolation
+                        const hexGrid = turf.interpolate(wellNitrate, hexbinArea, { 
+                            gridType: 'hex', 
+                            property: 'nitr_ran', 
+                            units: 'miles'
+                        });
+
+                        console.log("Interpolated Hexbin Grid Generated:", hexGrid);
+
+                        let residuals = [];
+
+                        //computes residuals for hexbins
+                        hexGrid.features.forEach(hex => {
+                            const nitrateLevel = hex.properties.nitr_ran || 0; // Use interpolated nitrate value
+                            hex.properties.predicted_cancer = regressionResults.m * nitrateLevel + regressionResults.b; // Predicted Cancer Rate
+
+                            //finds closest cancer tract
+                            let nearestCancerTract = cancerTracts.features
+                                .map(tract => {
+                                    let tractPoint = turf.centroid(tract);
+                                    let distance = turf.distance(turf.centroid(hex), tractPoint, { units: 'miles' });
+                                    return {
+                                        actual: tract.properties.canrate,  // Actual cancer rate
+                                        distance: distance
+                                    };
+                                })
+                                .sort((a, b) => a.distance - b.distance)[0];  // Find closest tract
+
+                            if (nearestCancerTract && typeof nearestCancerTract.actual === 'number') {
+                                hex.properties.actual_cancer = nearestCancerTract.actual;  // Store observed cancer rate
+
+                                let residual = nearestCancerTract.actual - hex.properties.predicted_cancer;
+                                hex.properties.residual = residual;
+                                residuals.push(residual);
+                            } else {
+                                hex.properties.actual_cancer = null; // No data available
+
+                                hex.properties.residual = null;
+                            }
+                        });
+
+                        console.log("Residuals Calculated:", residuals);
+
+                        //computes standard deviation of Residuals
+                        let meanResidual = residuals.reduce((sum, r) => sum + r, 0) / residuals.length;
+                        let stdDevResidual = Math.sqrt(residuals.reduce((sum, r) => sum + Math.pow(r - meanResidual, 2), 0) / residuals.length);
+
+                        console.log("Residual Mean:", meanResidual, "Residual StdDev:", stdDevResidual);
+
+                        //assigns diverging colors for residuals**
+                        hexGrid.features.forEach(hex => {
+                            let residual = hex.properties.residual;
+                            if (residual !== null) {
+                                if (residual < -2 * stdDevResidual) {
+                                    hex.properties.color = '#67001f';
+                                } else if (residual < -stdDevResidual) {
+                                    hex.properties.color = '#d6604d';
+                                } else if (residual < stdDevResidual) {
+                                    hex.properties.color = '#f7f7f7';
+                                } else if (residual < 2 * stdDevResidual) {
+                                    hex.properties.color = '#4393c3';
+                                } else {
+                                    hex.properties.color = '#053061';
+                                }
+                            } else {
+                                hex.properties.color = '#cccccc';
+                            }
+                        });
+
+                        console.log("Hexbin Colors Assigned Based on Residuals");
+
+                        //updates hexbin source data
+                        if (map.getSource('aggregated-grid')) {
+                            map.getSource('aggregated-grid').setData(hexGrid);
+                        } else {
+                            console.error("Hexbin layer source not found.");
+                        }
+
+                        //toggles visibility of layers
+                        map.setLayoutProperty('aggregated-grid-layer', 'visibility', 'visible');
+                        map.setLayoutProperty('aggregated-grid-border', 'visibility', 'visible');
+                        map.setLayoutProperty('cancer-tracts-layer', 'visibility', 'none');
+                        map.setLayoutProperty('well-nitrate-layer', 'visibility', 'none');
+
+                        //updates button states on map
+                        document.getElementById('aggregated-grid-layer').classList.add('active');
+                        document.getElementById('cancer-tracts-layer').classList.remove('active');
+                        document.getElementById('well-nitrate-layer').classList.remove('active');
+
+                        //ensures only the hexbin legend shows after calculation
+                        document.getElementById('legend').style.display = 'none';
+                        document.getElementById('cancer-legend').style.display = 'none';
+                        document.getElementById('hexbin-legend').style.display = 'block';
+
+                        console.log("Hexbin Calculation Complete!");
+                    }, 500);
+
+                } else {
+                    console.warn("Regression data is empty. No regression performed.");
+                }
+
+            } catch (error) {
+                console.error("Error in calculateHexbins:", error);
+            }
+        }
+
+
+        //when reset hexbin button is pushed, resets map to original state
+        document.getElementById('reset-hexbin').addEventListener('click', function () {
+            location.reload();
+        });
+
+        //function to perform regression analysis
+        function performRegression(data) {
+            if (data.length === 0) {
+                console.warn("No data available for regression.");
+                return;
+            }
+
+            const result = regression.linear(data, { precision: 4 });
+
+            //checks if the results are valid
+            if (!result || !result.equation || result.equation.length < 2) {
+                console.error("Regression failed: invalid result", result);
+                return;
+            }
+
+            const equation = `y = ${result.equation[0].toFixed(4)}x + ${result.equation[1].toFixed(4)}`;
+            const rSquared = `R² = ${result.r2.toFixed(4)}`;
+
+            //stores regression results globally
+            regressionResults = { 
+                m: result.equation[0], 
+                b: result.equation[1],
+                r2: result.r2 
+            };
+
+            console.log("Regression Results:", regressionResults);
+
+            //displays results
+            document.getElementById('regression-results').innerHTML = `
+                <strong>Regression Results</strong><br>
+                ${equation} <br>
+                ${rSquared}
+            `;
+            document.getElementById('regression-results').style.display = 'block';
+        }
+
+
+    });
+    </script>
+</body>
+</html>
