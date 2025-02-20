@@ -84,7 +84,7 @@
 
         .legend {
             position: absolute;
-            bottom: 20px;
+            bottom: 15px;
             left: 20px;
             background: rgba(255, 255, 255, 0.9);
             padding: 10px;
@@ -121,8 +121,8 @@
 
         #cancer-legend {
             position: absolute;
-            bottom: 20px;
-            left: 150px; /* Adjust positioning */
+            bottom: 15px;
+            left: 160px;
             background: rgba(255, 255, 255, 0.9);
             padding: 10px;
             border-radius: 5px;
@@ -158,7 +158,7 @@
 
         #hexbin-legend {
             position: absolute;
-            bottom: 20px;
+            bottom: 15px;
             left: 280px;
             background: rgba(255, 255, 255, 0.9);
             padding: 10px;
@@ -194,6 +194,36 @@
             border: 1px solid #000;
         }
 
+        #basemap-menu {
+        position: absolute;
+        top: 10px;
+        right: 50px;
+        background: rgba(255, 255, 255, 0.9);
+        padding: 10px;
+        border-radius: 5px;
+        font-family: Arial, sans-serif;
+        box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
+        z-index: 1000;
+        }
+
+        #basemap-menu button {
+            display: block;
+            width: 100px;
+            margin: 5px;
+            padding: 8px;
+            border: none;
+            cursor: pointer;
+            font-size: 12px;
+            background: #3887be;
+            color: white;
+            border-radius: 3px;
+            transition: background 0.2s ease-in-out;
+        }
+
+        #basemap-menu button:hover {
+            background: #3074a4;
+        }
+
 
     </style>
 </head>
@@ -201,11 +231,12 @@
     <div id="left-panel">
         <h2>Nitrate and Cancer Rates in Wisconsin</h2>
         <p style="font-size: 14px; color: black; text-align: center; margin-bottom: 10px;">
-            To perform a linear regression on the cancer rates in Wisconsin by nitrate levels recorded in wells, 
-            enter a decay coefficient greater than 0, and a hexbin area from 6-90 square miles. The resulting hexbins will
-            appear on the screen. Additionally, the regression equation fit will appear below, as well as an R Squared value. The
+            - To perform a linear regression on the cancer rates in Wisconsin by nitrate levels recorded in wells, 
+            enter a decay coefficient greater than 0, and a hexbin area from 6-90 square miles. The resulting hexbins will appear on the screen. <br>
+            - Additionally, the regression equation fit will appear below, as well as an R Squared value. The
             closer R Squared is to 1, the better the model fit. To help with the visualization, the user can right click and hold to pan the
-            view down to see a 3D representation of the hexbin levels.
+            view down to see a 3D representation of the hexbin levels.<br>
+            - To calculate a different set of hexbins, you MUST hit the "Reset Hexbin Button".
         </p>
         <label for="decay-coefficient">Decay Coefficient</label>
         <input type="number" id="decay-coefficient" placeholder="Enter value">
@@ -242,6 +273,11 @@
     <div id="hexbin-legend" class="legend">
         <h3>Hexbin Stadard Deviation of Residuals</h3>
         <div class="legend-scale"></div>
+    </div>
+    <div id="basemap-menu">
+        <button onclick="switchBasemap('mapbox://styles/mapbox/dark-v10')">Dark Mode</button>
+        <button onclick="switchBasemap('mapbox://styles/mapbox/light-v10')">Light Mode</button>
+        <button onclick="switchBasemap('mapbox://styles/mapbox/satellite-v9')">Satellite</button>
     </div>    
     <nav id="menu"></nav> 
     <div id="map"></div>
@@ -283,6 +319,16 @@
                 return await response.json();
             };
 
+            //adds additional basemap tileset for the user to choose from
+            function switchBasemap(styleURL) {
+                map.setStyle(styleURL);
+
+                //waits for new styles to load before re-adding layers
+                map.once('style.load', () => {
+                    //adds layers and sources here if necessary
+                });
+            }
+
             //fetches geojsons
             const cancerTracts = await fetchGeoJSON('cancer_tracts.geojson');
             const cancerCounty = await fetchGeoJSON('cancer_county.geojson');
@@ -299,11 +345,11 @@
 
             //defines color scale for well nitrate levels
             const nitrateLevels = [
-                { value: "0", color: "#ffffb2" }, 
-                { value: "2", color: "#fecc5c" },
-                { value: "5", color: "#fd8d3c" },
-                { value: "10", color: "#f03b20" },
-                { value: "15+", color: "#bd0026" } 
+                { value: "0.00 - 1.99", color: "#ffffb2" }, 
+                { value: "2.00 - 4.99", color: "#fecc5c" },
+                { value: "5.00 - 9.99", color: "#fd8d3c" },
+                { value: "10.00 - 14.99", color: "#f03b20" },
+                { value: "15.00 and Higher", color: "#bd0026" } 
             ];
 
             //populates the nitrate legend dynamically
@@ -329,11 +375,11 @@
 
             //defines color scale
             const cancerLevels = [
-                { value: "0", color: "#edf8fb" },
-                { value: "0.05", color: "#b2e2e2" },
-                { value: "0.10", color: "#66c2a4" },
-                { value: "0.15", color: "#2ca25f" },
-                { value: "0.20+", color: "#006d2c" }
+                { value: "0%", color: "#edf8fb" },
+                { value: "0.05%", color: "#b2e2e2" },
+                { value: "0.10%", color: "#66c2a4" },
+                { value: "0.15%", color: "#2ca25f" },
+                { value: "0.20+%", color: "#006d2c" }
             ];
 
             //populates legend
@@ -517,10 +563,9 @@
 
             //adds a click event listener for the hexbin layer
             map.on('click', 'aggregated-grid-layer', (e) => {
-                console.log("Hexbin clicked:", e.features[0]);  // Check if clicking works
             
 
-                const feature = e.features[0];  // Get clicked hexbin
+                const feature = e.features[0];
                 const properties = feature.properties;
 
                 //gets observed and predicted cancer rates
@@ -613,11 +658,15 @@
         //function to calculate hexbins and then display them as well as run the regression equation and display its results
         function calculateHexbins() {
             try {
-                console.log("Starting hexbin calculation...");
 
                 //gets user inputs
                 const decayCoefficient = parseFloat(document.getElementById('decay-coefficient').value);
                 const hexbinArea = parseFloat(document.getElementById('hexbin-area').value);
+
+                if (isNaN(decayCoefficient) || decayCoefficient <= 0) {
+                    alert("Please enter a valid decay coefficient greater than 0.");
+                    return;
+                }
 
                 if (isNaN(decayCoefficient) || isNaN(hexbinArea) || hexbinArea < 6 || hexbinArea > 90) {
                     alert("Please enter a valid decay coefficient and hexbin area between 6 and 90.");
@@ -630,10 +679,10 @@
                     return;
                 }
 
-                console.log("Generating regression data...");
 
                 //generates regression data
                 let regressionData = [];
+
                 cancerTracts.features.forEach(tract => {
                     if (!tract.geometry || !tract.geometry.coordinates) {
                         console.warn("Skipping tract with missing geometry:", tract);
@@ -661,10 +710,14 @@
                     }
                 });
 
-                console.log("Regression Data Prepared:", regressionData);
+
 
                 //ensures regression is computed before continuing
                 if (regressionData.length > 0) {
+                    console.log("Updated Regression Data:", regressionData);
+                    console.log("Regression Data Before Regression:", regressionData);
+
+
                     performRegression(regressionData);
 
                     setTimeout(() => {
@@ -674,23 +727,23 @@
                             return;
                         }
 
-                        console.log("Regression successfully computed. Proceeding with hexbin computation.");
-
                         //generates hexbins using idw interpolation
                         const hexGrid = turf.interpolate(wellNitrate, hexbinArea, { 
                             gridType: 'hex', 
                             property: 'nitr_ran', 
-                            units: 'miles'
+                            units: 'miles',
+                            weight: decayCoefficient,
                         });
+                        console.log("Interpolated Hexbin Grid with Decay Coefficient:", hexGrid);
 
-                        console.log("Interpolated Hexbin Grid Generated:", hexGrid);
 
                         let residuals = [];
 
                         //computes residuals for hexbins
                         hexGrid.features.forEach(hex => {
-                            const nitrateLevel = hex.properties.nitr_ran || 0; // Use interpolated nitrate value
-                            hex.properties.predicted_cancer = regressionResults.m * nitrateLevel + regressionResults.b; // Predicted Cancer Rate
+
+                            const nitrateLevel = hex.properties.nitr_ran || 0;
+                            hex.properties.predicted_cancer = regressionResults.m * nitrateLevel + regressionResults.b;
 
                             //finds closest cancer tract
                             let nearestCancerTract = cancerTracts.features
@@ -705,25 +758,24 @@
                                 .sort((a, b) => a.distance - b.distance)[0];  // Find closest tract
 
                             if (nearestCancerTract && typeof nearestCancerTract.actual === 'number') {
-                                hex.properties.actual_cancer = nearestCancerTract.actual;  // Store observed cancer rate
+                                hex.properties.actual_cancer = nearestCancerTract.actual;
+                                regressionData.push([nitrateLevel, nearestCancerTract.actual]);
 
                                 let residual = nearestCancerTract.actual - hex.properties.predicted_cancer;
                                 hex.properties.residual = residual;
                                 residuals.push(residual);
                             } else {
-                                hex.properties.actual_cancer = null; // No data available
+                                hex.properties.actual_cancer = null;
 
                                 hex.properties.residual = null;
                             }
                         });
 
-                        console.log("Residuals Calculated:", residuals);
 
                         //computes standard deviation of Residuals
                         let meanResidual = residuals.reduce((sum, r) => sum + r, 0) / residuals.length;
                         let stdDevResidual = Math.sqrt(residuals.reduce((sum, r) => sum + Math.pow(r - meanResidual, 2), 0) / residuals.length);
 
-                        console.log("Residual Mean:", meanResidual, "Residual StdDev:", stdDevResidual);
 
                         //assigns diverging colors for residuals**
                         hexGrid.features.forEach(hex => {
@@ -745,7 +797,6 @@
                             }
                         });
 
-                        console.log("Hexbin Colors Assigned Based on Residuals");
 
                         //updates hexbin source data
                         if (map.getSource('aggregated-grid')) {
@@ -770,7 +821,6 @@
                         document.getElementById('cancer-legend').style.display = 'none';
                         document.getElementById('hexbin-legend').style.display = 'block';
 
-                        console.log("Hexbin Calculation Complete!");
                     }, 500);
 
                 } else {
@@ -813,7 +863,6 @@
                 r2: result.r2 
             };
 
-            console.log("Regression Results:", regressionResults);
 
             //displays results
             document.getElementById('regression-results').innerHTML = `
