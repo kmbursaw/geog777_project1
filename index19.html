@@ -292,7 +292,7 @@
     
 
     <script>
-        document.addEventListener("DOMContentLoaded", function () {
+        //document.addEventListener("DOMContentLoaded", function () {
 
 
             //mapbox access token
@@ -712,8 +712,6 @@
             //this function was a collaboration between the student and chatgpt, where the student provided a function and then refined it
             function calculateHexbins() {
                 try {
-                    document.getElementById('spinner').style.display = 'block';
-
 
                     setTimeout(() => {
                         //gets user inputs
@@ -736,7 +734,7 @@
                             return;
                         }
 
-                        
+                        document.getElementById('spinner').style.display = 'block';
 
                         //generates regression data
                         let regressionData = [];
@@ -935,7 +933,7 @@
 
 
             });
-        });
+        //});
     </script>
 </body>
 </html>
